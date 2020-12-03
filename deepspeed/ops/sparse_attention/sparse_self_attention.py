@@ -38,18 +38,18 @@ class SparseSelfAttention(nn.Module):
         self.key_padding_mask_mode = key_padding_mask_mode
         self.attn_mask_mode = attn_mask_mode
 
-    ops = dict()
+    ops = dict() # SSY caching a dynamically generated operator for a particular length
 
     # add to cache
     def get_ops(self, H, L):
         import sys
         if L not in SparseSelfAttention.ops:
-            sparsity_layout = self.sparsity_config.make_layout(L)
-            sparse_dot_sdd_nt = MatMul(sparsity_layout,
+            sparsity_layout = self.sparsity_config.make_layout(L) # SSY an index matrix with 1 means a block*block small matrix
+            sparse_dot_sdd_nt = MatMul(sparsity_layout,  # MatMul is a class , not a function
                                        self.sparsity_config.block,
-                                       'sdd',
+                                       'sdd', # SSY sparse result = dense * dense
                                        trans_a=False,
-                                       trans_b=True)
+                                       trans_b=True)  # SSY need to transpose b
 
             sparse_dot_dsd_nn = MatMul(sparsity_layout,
                                        self.sparsity_config.block,
@@ -67,14 +67,14 @@ class SparseSelfAttention(nn.Module):
     def transpose_key_for_scores(self, x, L):
         bsz, num_heads, seq_len, head_dim = x.size()
         if seq_len != L:
-            return x.permute(0, 1, 3, 2)
+            return x.permute(0, 1, 3, 2) # SSY transpose the last two dims
         return x
 
     def transpose_mask_for_sparse(self, qtype, x, is_key_padding_mask=False):
         x = x.type(qtype)
         if is_key_padding_mask:
             xdim = x.dim()
-            for d in range(xdim - 1, 0, -1):
+            for d in range(xdim - 1, 0, -1): # SSY remove the dim d if it have only one element
                 x = x.squeeze(dim=d)
             return x
         return x.squeeze()
@@ -108,7 +108,7 @@ class SparseSelfAttention(nn.Module):
         key = self.transpose_key_for_scores(key, tgt_len)
 
         # check that operation is supported
-        if query.shape != key.shape or key.shape != value.shape:
+        if query.shape != key.shape or key.shape != value.shape:  # SSY only self attention
             raise NotImplementedError('only self-attention is supported for now')
 
         # squeeze key_padding_mask if it is given
@@ -122,7 +122,7 @@ class SparseSelfAttention(nn.Module):
             attn_mask = self.transpose_mask_for_sparse(query.dtype, attn_mask)
 
         # cache look-up table computations etc
-        sparse_dot_sdd_nt, sparse_dot_dsd_nn, sparse_softmax = self.get_ops(num_heads, tgt_len)
+        sparse_dot_sdd_nt, sparse_dot_dsd_nn, sparse_softmax = self.get_ops(num_heads, tgt_len) # SSY get the operator for particular tgt_len
 
         scaling = float(head_dim)**-0.5
 

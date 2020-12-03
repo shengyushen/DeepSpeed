@@ -42,7 +42,7 @@ class SparsityConfig:
             )
         num_blocks = seq_len // self.block
         # TODO Currently we allocate layout per head; needs to be updated if heads share a single layout.
-        layout = torch.zeros((self.num_heads, num_blocks, num_blocks), dtype=torch.int64)
+        layout = torch.zeros((self.num_heads, num_blocks, num_blocks), dtype=torch.int64) # SSY this is actually an index matrix indicating each block*block 
         return layout
 
     def check_and_propagate_first_head_layout(self, layout):
@@ -87,7 +87,7 @@ class DenseSparsityConfig(SparsityConfig):
         """
 
         layout = self.setup_layout(seq_len)
-        layout[:, :, :] = 1
+        layout[:, :, :] = 1 # SSY each block is dense
         return layout
 
 
